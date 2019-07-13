@@ -16,6 +16,22 @@ const callWeatherAlertHeadlines = function (lat, lon) {
 
   request(options)
     .then(parsedBody => {
+      console.log(parsedBody);
+      let detailKeys = weatherAlertHeadlines.handleResponse(parsedBody)
+      if (detailKeys && detailKeys.length > 0) {
+        detailKeys.forEach(detailKey => {
+          callWeatherAlertDetails(detailKey)
+        })
+      }
+    })
+    .catch(handleFail)
+}
+
+const callWeatherAlertHeadlinesByState = function (state, country) {
+  let options = weatherAlertHeadlines.requestByStateOptions(state,country,'');
+  console.log(options);
+  request(options)
+    .then(parsedBody => {
       let detailKeys = weatherAlertHeadlines.handleResponse(parsedBody)
       if (detailKeys && detailKeys.length > 0) {
         detailKeys.forEach(detailKey => {
@@ -70,11 +86,15 @@ const loc = {
   jakarta: { lat: '-5.7759349', lon: '106.1161341' } // Jakarta, Indonesia
 }
 
+const states = {
+  california : {stateCode: 'CA', countryCode: 'US'}
+};
 /**
  * Make a single API call
  */
-callDailyForecast(loc.raleigh.lat, loc.raleigh.lon)
+// callDailyForecast(loc.raleigh.lat, loc.raleigh.lon)
 // callWeatherAlertHeadlines(loc.lakecity.lat, loc.lakecity.lon)
+callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode);
 // callSevereWeatherPowerDisruption(loc.jakarta.lat, loc.jakarta.lon)
 // callTropicalForecastProjectedPath()
 // callWeatherAlertDetails('06439e88-320a-3722-ae90-097484ff2277')
