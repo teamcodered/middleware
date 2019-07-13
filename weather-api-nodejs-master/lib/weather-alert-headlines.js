@@ -72,7 +72,9 @@ exports.handleResponse = function (res) {
 }
 
 exports.handleResponseFiltered = function (res) {
-  let details = []
+  let alertsWrapper = [];
+  let alertsMainStream = {};
+  let details = [];
   let filteredAlerts = [];
   console.log("from the begining once the results are here "+res.alerts.length);
   if (res && res.hasOwnProperty('alerts')) {
@@ -80,11 +82,23 @@ exports.handleResponseFiltered = function (res) {
     filteredAlerts = weatherAPIWatchlist.filterAlertEventToFireRelated(res.alerts);
     filteredAlerts.forEach(alert => {
       // check some fields to decide if this alert is important to you.
-      
       // Basic initial filtering will be done here, the rest will be done on the analytics DB
       // if(weatherAPIWatchlist.supportedAlertEventTypes.msgTypes.includes(alert.messageTypeCode)){
+        alertsMainStream = {};
       if (alert.certaintyCode <= 3 && alert.urgencyCode <= 3 && alert.severityCode <= 3) {
         details.push(alert.detailKey)
+        alertsMainStream.latitude = alert.latitude;
+        alertsMainStream.longitude = alert.longitude;
+        alertsMainStream.attributionText = generateAttributionDetails(alert);
+        alertsMainStream.detailKey = alert.detailKey;
+        alertsMainStream.headlineText = alert.headlineText;
+        alertsMainStream.areaId = alert.areaId;
+        alertsMainStream.areaName = alert.areaName;
+        alertsMainStream.adminDistrictCode = alert.adminDistrictCode;
+        alertsMainStream.adminDistrict = alert.adminDistrict;
+        alertsMainStream.identifier = alert.identifier;
+        alertsMainStream.processTimeUTC = alert.processTimeUTC;
+        alertsWrapper.push(alertsMainStream);
       }
       // }
     })
@@ -94,10 +108,12 @@ exports.handleResponseFiltered = function (res) {
     console.log('weather-alert-headlines: No alerts in area')
   }
 
-  return details
+  return alertsWrapper;
 }
 
-exports.generateAttributionDetails = function (selectedAlert){
+function generateAttributionDetails(selectedAlert){
   let attributionText = apiAttribution.generateAttribution(selectedAlert.officeName,selectedAlert.officeAdminDistrictCode,selectedAlert.officeCountryCode, selectedAlert.source,selectedAlert.disclaimer);
   return attributionText;
 }
+
+exports.generateAttributionDetails = generateAttributionDetails;

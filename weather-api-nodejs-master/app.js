@@ -1,5 +1,6 @@
 const request = require('request-promise-native')
 
+const currentsOnDemand = require('./lib/currents-on-demand');
 const weatherAlertHeadlines = require('./lib/weather-alert-headlines')
 const weatherAlertDetails = require('./lib/weather-alert-details')
 const tropicalForecastProjectedPath = require('./lib/tropical-forecast-projected-path')
@@ -27,17 +28,33 @@ const callWeatherAlertHeadlines = function (lat, lon) {
     .catch(handleFail)
 }
 
+const callCurrentsOnDemand = function(alertEvent){
+  let options = currentsOnDemand.requestOptions(alertEvent.latitude, alertEvent.longitude)
+
+  request(options)
+    .then(parsedBody => {
+      let weatherTempData = currentsOnDemand.handleResponse(parsedBody);
+    })
+    .catch(handleFail)
+};
+
 const callWeatherAlertHeadlinesByState = function (state, country) {
   let options = weatherAlertHeadlines.requestByStateOptions(state,country,'');
   console.log(options);
   request(options)
     .then(parsedBody => {
-      let detailKeys = weatherAlertHeadlines.handleResponseFiltered(parsedBody)
-      if (detailKeys && detailKeys.length > 0) {
-        detailKeys.forEach(detailKey => {
-          callWeatherAlertDetails(detailKey)
-        })
+      let alertsToWorkOn = weatherAlertHeadlines.handleResponseFiltered(parsedBody);
+      console.log(alertsToWorkOn);
+      if(alertsToWorkOn){
+        alertsToWorkOn.forEach( alert =>{
+          callCurrentsOnDemand(alert);
+        });
       }
+      // if (detailKeys && detailKeys.length > 0) {
+      //   detailKeys.forEach(detailKey => {
+      //     callWeatherAlertDetails(detailKey)
+      //   })
+      // }
     })
     .catch(handleFail)
 }
