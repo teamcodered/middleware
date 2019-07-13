@@ -73,17 +73,20 @@ exports.handleResponse = function (res) {
 
 exports.handleResponseFiltered = function (res) {
   let details = []
-
+  let filteredAlerts = [];
+  console.log("from the begining once the results are here "+res.alerts.length);
   if (res && res.hasOwnProperty('alerts')) {
     // loop through alerts
-    res.alerts.forEach(alert => {
+    filteredAlerts = weatherAPIWatchlist.filterAlertEventToFireRelated(res.alerts);
+    filteredAlerts.forEach(alert => {
       // check some fields to decide if this alert is important to you.
       
       // Basic initial filtering will be done here, the rest will be done on the analytics DB
-      if(alert.categories[0].categories)
+      // if(weatherAPIWatchlist.supportedAlertEventTypes.msgTypes.includes(alert.messageTypeCode)){
       if (alert.certaintyCode <= 3 && alert.urgencyCode <= 3 && alert.severityCode <= 3) {
         details.push(alert.detailKey)
       }
+      // }
     })
 
     console.log(`weather-alert-headlines: returning ${details.length} alert(s) meeting threshold out of ${res.alerts.length} total`)

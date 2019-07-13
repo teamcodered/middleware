@@ -32,7 +32,7 @@ const callWeatherAlertHeadlinesByState = function (state, country) {
   console.log(options);
   request(options)
     .then(parsedBody => {
-      let detailKeys = weatherAlertHeadlines.handleResponse(parsedBody)
+      let detailKeys = weatherAlertHeadlines.handleResponseFiltered(parsedBody)
       if (detailKeys && detailKeys.length > 0) {
         detailKeys.forEach(detailKey => {
           callWeatherAlertDetails(detailKey)
