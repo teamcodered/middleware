@@ -1,6 +1,7 @@
 module.exports = {
 	events: {
-		alertCODDone: 'alertsAreReady'
+        alertCODDone: 'alertsAreReady',
+        nextAPICall: 'next'
     },
     alerts:{
         fileLocation: '/alerts/capturedAlerts.json'

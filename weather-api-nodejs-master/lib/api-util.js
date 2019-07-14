@@ -1,3 +1,8 @@
+let Emitter = require('events');
+
+
+let nextAPICallEmitter = new Emitter();
+
 exports.HOST = 'https://api.weather.com'
 
 exports.defaultParams = function () {
@@ -13,4 +18,6 @@ exports.defaultParams = function () {
     },
     json: true // parse the response as JSON
   }
-}
+};
+
+exports.nextAPICallEmitter = nextAPICallEmitter;

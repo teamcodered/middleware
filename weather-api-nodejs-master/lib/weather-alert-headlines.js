@@ -24,6 +24,7 @@
 const apiUtil = require('./api-util');
 const apiAttribution = require('./api-attribution');
 const weatherAPIWatchlist = require('./weather-api-watchlist');
+let config = require('../events/config');
 
 exports.requestOptions = function (lat, lon) {
   let options = apiUtil.defaultParams()
@@ -43,7 +44,7 @@ exports.requestByStateOptions = function(adminDistrictCode, countryCode, next){
   options['uri'] = `${apiUtil.HOST}/v3/alerts/headlines`;
   options.qs['adminDistrictCode'] = `${adminDistrictCode}:${countryCode}`;
   options.qs['format'] = 'json';
-  if(next.length!=0)
+  if(next!=null)
     options.qs['next'] = next;
 
     return options;
@@ -78,7 +79,7 @@ exports.handleResponseFiltered = function (res) {
   let filteredAlerts = [];
   if (res && res.hasOwnProperty('alerts')) {
     // loop through alerts
-    filteredAlerts = weatherAPIWatchlist.filterAlertEventToFireRelated(res.alerts);
+    filteredAlerts = weatherAPIWatchlist.filterAlertEventToFireRelated(JSON.parse(JSON.stringify(res.alerts)));
     filteredAlerts.forEach(alert => {
       // check some fields to decide if this alert is important to you.
       // Basic initial filtering will be done here, the rest will be done on the analytics DB
@@ -101,7 +102,8 @@ exports.handleResponseFiltered = function (res) {
       }
       // }
     })
-
+    if(res.metadata.next != null)
+      apiUtil.nextAPICallEmitter.emit(config.events.nextAPICall, res.alerts.metadata.next);
     console.log(`weather-alert-headlines: returning ${details.length} alert(s) meeting threshold out of ${res.alerts.length} total`)
   } else {
     console.log('weather-alert-headlines: No alerts in area')

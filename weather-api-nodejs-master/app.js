@@ -1,8 +1,9 @@
 const request = require('request-promise-native')
 
+const apiUtil = require('./lib/api-util');
 const fs = require('fs');
-var Emitter = require('events');
-var config = require('./events/config');
+let Emitter = require('events');
+let config = require('./events/config');
 
 const currentsOnDemand = require('./lib/currents-on-demand');
 const jp = require('jsonpath');
@@ -17,7 +18,8 @@ let alertsFonud = [];
 let alertEventEmitter = new Emitter();
 const writable = fs.createWriteStream(__dirname + config.alerts.fileLocation, 'utf8');
 
-const handleAlertEmitter = function(){
+const handleAlertEmitter = function(msg){
+  console.log("&&&&&&&&&&&&&&  " + msg);
   console.log("Weather alerts are aggregated in the file");
   try{
     writable.write(JSON.stringify(alertsFonud));
@@ -32,8 +34,8 @@ const handleFail = function (err) {
 };
 
 
-// Event Emitters Listener
-alertEventEmitter.on(config.events.alertCODDone, handleAlertEmitter);
+// Main Event Emitters Listener
+alertEventEmitter.on(config.events.alertCODDone, (msg)=>handleAlertEmitter(msg));
 writable.on('error', function(e) {handleFail(e)});
 
 const callWeatherAlertHeadlines = function (lat, lon) {
@@ -60,17 +62,20 @@ const callCurrentsOnDemand = function(alertEvent){
       let tempNode = jp.nodes(alertsFonud, `$[?(@.detailKey=="${alertEvent.detailKey}")]`);
       tempNode[0].value.cod=weatherTempData;
       ++alertCounter;
-      if(alertsFonud.length == alertCounter)
-        alertEventEmitter.emit(config.events.alertCODDone);
+      if(alertsFonud.length == alertCounter){
+        alertEventEmitter.emit(config.events.alertCODDone, 'Done');
+        alertCounter=0;
+      }
     })
     .catch(handleFail)
 };
 
-const callWeatherAlertHeadlinesByState = function (state, country) {
-  let options = weatherAlertHeadlines.requestByStateOptions(state,country,'');
+const callWeatherAlertHeadlinesByState = function (state, country, next) {
+  let options = weatherAlertHeadlines.requestByStateOptions(state,country,next);
   request(options)
     .then(parsedBody => {
       let alertsToWorkOn = weatherAlertHeadlines.handleResponseFiltered(parsedBody);
+      // alertsFonud.push(JSON.parse(JSON.stringify(alertsToWorkOn)));
       alertsFonud = JSON.parse(JSON.stringify(alertsToWorkOn));
       if(alertsToWorkOn){
         alertsToWorkOn.forEach( alert =>{
@@ -139,10 +144,14 @@ const states = {
  */
 // callDailyForecast(loc.raleigh.lat, loc.raleigh.lon)
 // callWeatherAlertHeadlines(loc.lakecity.lat, loc.lakecity.lon)
-callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode);
+callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode, null);
 // callSevereWeatherPowerDisruption(loc.jakarta.lat, loc.jakarta.lon)
 // callTropicalForecastProjectedPath()
 // callWeatherAlertDetails('06439e88-320a-3722-ae90-097484ff2277')
+
+// Next API Event Emitters Listener
+apiUtil.nextAPICallEmitter.on(config.events.nextAPICall, (next)=>callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode, next));
+
 
 /**
  * Setting up a job to look for weather alert headlines every 10 minutes
@@ -151,5 +160,5 @@ const interval = 1000 * 60 * 10 // 10 minutes
 
 setInterval(() => {
   // callWeatherAlertHeadlines(loc.lakecity.lat, loc.lakecity.lon)
-  callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode);
+  callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode, null);
 }, interval)
