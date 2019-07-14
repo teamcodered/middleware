@@ -76,7 +76,6 @@ exports.handleResponseFiltered = function (res) {
   let alertsMainStream = {};
   let details = [];
   let filteredAlerts = [];
-  console.log("from the begining once the results are here "+res.alerts.length);
   if (res && res.hasOwnProperty('alerts')) {
     // loop through alerts
     filteredAlerts = weatherAPIWatchlist.filterAlertEventToFireRelated(res.alerts);

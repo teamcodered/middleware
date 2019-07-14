@@ -1,16 +1,40 @@
 const request = require('request-promise-native')
 
+const fs = require('fs');
+var Emitter = require('events');
+var config = require('./events/config');
+
 const currentsOnDemand = require('./lib/currents-on-demand');
+const jp = require('jsonpath');
 const weatherAlertHeadlines = require('./lib/weather-alert-headlines')
 const weatherAlertDetails = require('./lib/weather-alert-details')
 const tropicalForecastProjectedPath = require('./lib/tropical-forecast-projected-path')
 const dailyForecast = require('./lib/daily-forecast')
 const severeWeatherPower = require('./lib/severe-weather-power-disruption-index')
 
+let alertCounter = 0;
+let alertsFonud = [];
+let alertEventEmitter = new Emitter();
+const writable = fs.createWriteStream(__dirname + config.alerts.fileLocation, 'utf8');
+
+const handleAlertEmitter = function(){
+  console.log("Weather alerts are aggregated in the file");
+  try{
+    writable.write(JSON.stringify(alertsFonud));
+  }catch(e){
+    handleFail(e);
+  }
+};
+
 const handleFail = function (err) {
   // API call failed...
   console.error(err.hasOwnProperty('message') ? err.message : err)
-}
+};
+
+
+// Event Emitters Listener
+alertEventEmitter.on(config.events.alertCODDone, handleAlertEmitter);
+writable.on('error', function(e) {handleFail(e)});
 
 const callWeatherAlertHeadlines = function (lat, lon) {
   let options = weatherAlertHeadlines.requestOptions(lat, lon)
@@ -29,24 +53,28 @@ const callWeatherAlertHeadlines = function (lat, lon) {
 }
 
 const callCurrentsOnDemand = function(alertEvent){
-  let options = currentsOnDemand.requestOptions(alertEvent.latitude, alertEvent.longitude)
-
+  let options = currentsOnDemand.requestOptions(alertEvent.latitude, alertEvent.longitude);
   request(options)
     .then(parsedBody => {
       let weatherTempData = currentsOnDemand.handleResponse(parsedBody);
+      let tempNode = jp.nodes(alertsFonud, `$[?(@.detailKey=="${alertEvent.detailKey}")]`);
+      tempNode[0].value.cod=weatherTempData;
+      ++alertCounter;
+      if(alertsFonud.length == alertCounter)
+        alertEventEmitter.emit(config.events.alertCODDone);
     })
     .catch(handleFail)
 };
 
 const callWeatherAlertHeadlinesByState = function (state, country) {
   let options = weatherAlertHeadlines.requestByStateOptions(state,country,'');
-  console.log(options);
   request(options)
     .then(parsedBody => {
       let alertsToWorkOn = weatherAlertHeadlines.handleResponseFiltered(parsedBody);
-      console.log(alertsToWorkOn);
+      alertsFonud = JSON.parse(JSON.stringify(alertsToWorkOn));
       if(alertsToWorkOn){
         alertsToWorkOn.forEach( alert =>{
+          // console.log(alert);
           callCurrentsOnDemand(alert);
         });
       }
@@ -89,7 +117,7 @@ const callSevereWeatherPowerDisruption = function (lat, lon) {
   request(options)
     .then(severeWeatherPower.handleResponse)
     .catch(handleFail)
-}
+};
 
 // Configure the locations (lat/lon) you want to use
 const loc = {
@@ -122,5 +150,6 @@ callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.c
 const interval = 1000 * 60 * 10 // 10 minutes
 
 setInterval(() => {
-  callWeatherAlertHeadlines(loc.lakecity.lat, loc.lakecity.lon)
+  // callWeatherAlertHeadlines(loc.lakecity.lat, loc.lakecity.lon)
+  callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode);
 }, interval)
