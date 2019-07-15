@@ -1,6 +1,6 @@
 ---
 applications:
-- name: weather-api-nodejs
+- name: weather-alerts-api-feeder
   command: npm start
   path: .
   memory: 256M

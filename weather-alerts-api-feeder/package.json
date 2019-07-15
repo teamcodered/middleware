@@ -1,7 +1,7 @@
 {
-  "name": "weather-api-nodejs",
-  "version": "0.2.0",
-  "description": "Demonstrates using the Weather Company Data for IBM Cloud",
+  "name": "weather-alerts-api-feeder",
+  "version": "0.2.1",
+  "description": "Aggregate and fetch fire related alerts and feeds from the Weather Company Data for IBM Cloud Services",
   "main": "app.js",
   "scripts": {
     "start": "node app.js"
@@ -14,9 +14,6 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Call-for-Code/weather-api-nodejs.git"
-  },
-  "bugs": {
-    "url": "https://github.com/Call-for-Code/weather-api-nodejs/issues"
   },
   "homepage": "https://github.com/Call-for-Code/weather-api-nodejs#readme",
   "author": "Raj Singh <rrsingh@us.ibm.com> (http://rajsingh.org)",
