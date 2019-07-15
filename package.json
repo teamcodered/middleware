@@ -1,7 +1,7 @@
 {
   "name": "weather-alerts-api-feeder",
   "version": "0.2.1",
-  "description": "Aggregate and fetch fire related alerts and feeds from the Weather Company Data for IBM Cloud Services",
+  "description": "Aggregate and fetch fire related alerts and feeds from the Weather Company Data API for fireWatch Application",
   "main": "app.js",
   "scripts": {
     "start": "node app.js"
@@ -13,11 +13,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Call-for-Code/weather-api-nodejs.git"
+    "url": "git+https://github.com/teamcodered/weather-alerts-api-feeder.git"
   },
-  "homepage": "https://github.com/Call-for-Code/weather-api-nodejs#readme",
-  "author": "Raj Singh <rrsingh@us.ibm.com> (http://rajsingh.org)",
+  "homepage": "https://github.com/teamcodered/weather-alerts-api-feeder.git",
+  "author": "Mohammad Sharaf Hijjeh <sharaf.hijjeh@outlook.com> (https://github.com/abusharaf)",
   "contributors": [
+    "Raj Singh <rrsingh@us.ibm.com> (http://rajsingh.org)",
     "va barbosa <va@us.ibm.com> (https://github.com/vabarbosa/)"
   ],
   "license": "Apache-2.0"
