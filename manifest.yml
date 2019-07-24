@@ -10,4 +10,5 @@ applications:
   env:
     WEATHER_API_KEY: <YOUR_API_KEY>
     NPM_CONFIG_PRODUCTION: false
+    PORT: <PORT_NUMBER>
   buildpack: sdk-for-nodejs

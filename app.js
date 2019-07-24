@@ -4,6 +4,9 @@ const apiUtil = require('./lib/api-util');
 const fs = require('fs');
 let Emitter = require('events');
 let config = require('./events/config');
+const express = require('express');
+const app = express();
+const portNumber = process.env.PORT || 3000;
 
 const currentsOnDemand = require('./lib/currents-on-demand');
 const jp = require('jsonpath');
@@ -54,43 +57,50 @@ const callWeatherAlertHeadlines = function (lat, lon) {
     .catch(handleFail)
 }
 
-const callCurrentsOnDemand = function(alertEvent){
+const callCurrentsOnDemand = async function(alertEvent){
   let options = currentsOnDemand.requestOptions(alertEvent.latitude, alertEvent.longitude);
-  request(options)
-    .then(parsedBody => {
-      let weatherTempData = currentsOnDemand.handleResponse(parsedBody);
-      let tempNode = jp.nodes(alertsFonud, `$[?(@.detailKey=="${alertEvent.detailKey}")]`);
+  await request(options)
+    .then(async parsedBody => {
+      let weatherTempData = await currentsOnDemand.handleResponse(parsedBody);
+      let tempNode = await jp.nodes(alertsFonud, `$[?(@.detailKey=="${alertEvent.detailKey}")]`);
       tempNode[0].value.cod=weatherTempData;
       ++alertCounter;
       if(alertsFonud.length == alertCounter){
         alertEventEmitter.emit(config.events.alertCODDone, 'Done');
         alertCounter=0;
       }
+      return alertsFonud;
     })
     .catch(handleFail)
+  return alertsFonud;
 };
 
-const callWeatherAlertHeadlinesByState = function (state, country, next) {
+const callWeatherAlertHeadlinesByState =  async function (state, country, next) {
   let options = weatherAlertHeadlines.requestByStateOptions(state,country,next);
-  request(options)
-    .then(parsedBody => {
-      let alertsToWorkOn = weatherAlertHeadlines.handleResponseFiltered(parsedBody);
-      // alertsFonud.push(JSON.parse(JSON.stringify(alertsToWorkOn)));
-      alertsFonud = JSON.parse(JSON.stringify(alertsToWorkOn));
-      if(alertsToWorkOn){
-        alertsToWorkOn.forEach( alert =>{
-          // console.log(alert);
-          callCurrentsOnDemand(alert);
-        });
-      }
+  
+  await request(options)
+    .then(async parsedBody => {
+        let alertsToWorkOn = await weatherAlertHeadlines.handleResponseFiltered(parsedBody);
+        // alertsFonud.push(JSON.parse(JSON.stringify(alertsToWorkOn)));
+        alertsFonud = await JSON.parse(JSON.stringify(alertsToWorkOn));
+        
+         if(alertsToWorkOn){
+           alertsToWorkOn.forEach(async alert =>{
+            // console.log(alert);
+            await callCurrentsOnDemand(alert);
+          });
+        }
+      
+      return alertsFonud;
       // if (detailKeys && detailKeys.length > 0) {
       //   detailKeys.forEach(detailKey => {
       //     callWeatherAlertDetails(detailKey)
       //   })
       // }
     })
-    .catch(handleFail)
-}
+    .catch(handleFail);
+  return alertsFonud;
+};
 
 const callWeatherAlertDetails = function (detailKey) {
   let options = weatherAlertDetails.requestOptions(detailKey)
@@ -139,12 +149,18 @@ const loc = {
 const states = {
   california : {stateCode: 'CA', countryCode: 'US'}
 };
+
+app.get("/loadAggregatedWeatherAlerts", async (request, response, next) => {
+  let alerts = await callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode, null);
+  console.log("Aler`ts "+ alerts);
+  response.json(alerts);
+});
 /**
  * Make a single API call
  */
 // callDailyForecast(loc.raleigh.lat, loc.raleigh.lon)
 // callWeatherAlertHeadlines(loc.lakecity.lat, loc.lakecity.lon)
-callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode, null);
+// callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode, null);
 // callSevereWeatherPowerDisruption(loc.jakarta.lat, loc.jakarta.lon)
 // callTropicalForecastProjectedPath()
 // callWeatherAlertDetails('06439e88-320a-3722-ae90-097484ff2277')
@@ -152,13 +168,14 @@ callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.c
 // Next API Event Emitters Listener
 apiUtil.nextAPICallEmitter.on(config.events.nextAPICall, (next)=>callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode, next));
 
+app.listen(portNumber);
 
 /**
  * Setting up a job to look for weather alert headlines every 10 minutes
  */
-const interval = 1000 * 60 * 10 // 10 minutes
+// const interval = 1000 * 60 * 10 // 10 minutes
 
-setInterval(() => {
-  // callWeatherAlertHeadlines(loc.lakecity.lat, loc.lakecity.lon)
-  callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode, null);
-}, interval)
+// setInterval(() => {
+//   // callWeatherAlertHeadlines(loc.lakecity.lat, loc.lakecity.lon)
+//   callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode, null);
+// }, interval)
