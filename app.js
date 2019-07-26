@@ -1,7 +1,8 @@
 // Load Modules for handlling HTTP Requests.
 const request = require('request-promise-native');
 const createError = require('http-errors');
-// const setupHTTP = require('./middleware/global-handlers');
+const setupHTTP = require('./middleware/global-handlers');
+let intervalObjectReference = null;
 // const zlib = require('zlib');
 // const gzip = zlib.createGzip();
 
@@ -25,15 +26,15 @@ app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'jade');
 // -- View Static Resources
 app.use(express.static(path.join(__dirname, 'public')));
-// setupHTTP(app);
+setupHTTP(app);
 
 // Load Extrax modules for playing with complex json objects
 const jp = require('jsonpath');
 
 // Load embedded modules for working with external Weather APIs
 const currentsOnDemand = require('./lib/currents-on-demand');
-const weatherAlertHeadlines = require('./lib/weather-alert-headlines')
-const weatherAlertDetails = require('./lib/weather-alert-details')
+const weatherAlertHeadlines = require('./lib/weather-alert-headlines');
+const weatherAlertDetails = require('./lib/weather-alert-details');
 
 // Initiate global variables 
 let alertCounter = 0;
@@ -45,29 +46,30 @@ let alertEventEmitter = new Emitter();
 let interval = 1000 * 60 * 60 // 60 minutes as default value
 
 
-const writable = fs.createWriteStream(path.join(__dirname,eventsConfig.alerts.fileLocation), 'utf8');
-
-
-const handleAlertEmitter = function(msg){
-  console.log("Auto generated message from ON DEMAND service layer" + msg);
-  console.log("============= Weather alerts are aggregated in the file");
-  try{
-    writable.write(JSON.stringify(alertsFonud));
-  }catch(e){
-    handleFail(e);
-  }
-};
-
-
 const handleFail = function (err) {
   // API call failed...
   console.error(err.hasOwnProperty('message') ? err.message : err);
 
 };
 
+
+const handleAlertEmitter = function(msg){
+  fs.unlinkSync(path.join(__dirname,eventsConfig.alerts.fileLocation));
+  console.log("===== File is cleared =====");
+  const writable = fs.createWriteStream(path.join(__dirname,eventsConfig.alerts.fileLocation), 'utf8');
+  console.log("Auto generated message from ON DEMAND service layer " + msg);
+  try{
+    writable.write(JSON.stringify(alertsFonud));
+    console.log("======= Weather alerts are aggregated in the file =======");
+  }catch(e){
+    handleFail(e);
+  }
+  writable.on('error', function(e) {handleFail(e)});
+};
+
 // Main Event Emitters Listener
 alertEventEmitter.on(eventsConfig.events.alertCODDone, (msg)=>handleAlertEmitter(msg));
-writable.on('error', function(e) {handleFail(e)});
+
 
 const callWeatherAlertHeadlines = function (lat, lon) {
   let options = weatherAlertHeadlines.requestOptions(lat, lon)
@@ -112,7 +114,6 @@ const callWeatherAlertHeadlinesByState =  async function (state, country, next) 
         
          if(alertsToWorkOn){
            alertsToWorkOn.forEach(alert =>{
-            // console.log(alert);
             callCurrentsOnDemand(alert);
           });
         }
@@ -153,7 +154,6 @@ const states = {
   california : {stateCode: 'CA', countryCode: 'US'}
 };
 
-console.log(config.getAlertsDetailsENDPOINT());
 // Next API Event Emitters Listener
 apiUtil.nextAPICallEmitter.on(eventsConfig.events.nextAPICall, (next)=>callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode, next));
 
@@ -177,24 +177,49 @@ app.get(config.getAlertsDetailsENDPOINT(), (request, response) => {
   response.json(JSON.parse(readable));
 });
 
-app.post(config.getConfigureAlertsENDPOINT, (request, response, next) => {
+app.post(config.getConfigureAlertsENDPOINT(), (request, response, next) => {
   const postOutput = {'status': 'success'};
   try{
     let intervalInput = request.body.interval;
     if(intervalInput != undefined && intervalInput != 0){
       interval = 1000 * 60 * intervalInput;
-      setInterval(() => {
+      postOutput.intervalText = "The service will be frequently executed every " + intervalInput + "-minute"; 
+      postOutput.interval = interval;
+      postOutput.intervalType = "seconds";
+      intervalObjectReference = setInterval(() => {
         callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode, null);
       }, interval)
+      response.status(200);
+    }else{
+      postOutput.status = 'disabled';
+      postOutput.intervalText = "The service won't be running on frequent basis since the interval config is missing";
+      postOutput.interval = 'NA';
+      // const errorCode = new createError.BadRequest();
+      response.status(400);
     }
-  }catch(e){
-    next(createError(500));
+  }catch(error){
+    postOutput.status = "failed";
+    postOutput.errorMessage = error.message;
+    response.status(500);
+    // throw new Error('Required');
+    // next(createError(500),postOutput);
   }
   response.json(postOutput);
 });
 
-
-
+app.post(config.getStopFrequentAlertsENDPOINT(), (request,response,next)=>{
+  const postOutput = {'status': 'success'};
+  try{
+    clearInterval(intervalObjectReference);
+    postOutput.message = "Frequent Alerts Updates have been disabled";
+    response.status(200);
+  }catch(e){
+    postOutput.status = "failed";
+    postOutput.errorMessage = error.message;
+    response.status(500);
+  }
+  response.json(postOutput);
+});
 
 
 // Initiate the file with list of alerts
@@ -210,7 +235,6 @@ app.use(function(err, req, res, next) {
   // set locals, only providing error in development
   res.locals.message = err.message;
   res.locals.error = req.app.get('env') === 'development' ? err : {};
-  
   // Render the error page
   res.status(err.status || 500);
   res.render('error');

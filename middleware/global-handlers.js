@@ -19,6 +19,4 @@ module.exports = function(app){
     app.use(methodOverride());
 
     app.use(logErrors);
-  
-
 };

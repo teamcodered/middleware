@@ -9,5 +9,8 @@ module.exports = {
     },
     getConfigureAlertsENDPOINT: function() {
         return configValues.configureFrequency_ENDPOINT;
+    },
+    getStopFrequentAlertsENDPOINT: function() {
+        return configValues.stopFrequency_ENDPOINT;
     }
 }
