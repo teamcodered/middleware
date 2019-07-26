@@ -1,0 +1,5 @@
+{
+    "alertsSummary_ENDPOINT": "/load-aggregated-alerts-summary",
+    "alertsDetail_ENDPOINT": "/load-aggregated-alerts-detail",
+    "configureFrequency_ENDPOINT": "/configure-load-frequency"
+}

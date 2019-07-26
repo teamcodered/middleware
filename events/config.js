@@ -4,6 +4,6 @@ module.exports = {
         nextAPICall: 'next'
     },
     alerts:{
-        fileLocation: '/alerts/capturedAlerts.json'
+        fileLocation: 'alerts/capturedAlerts.json'
     }
 }

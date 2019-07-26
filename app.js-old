@@ -1,56 +1,34 @@
 // Load Modules for handlling HTTP Requests.
-const request = require('request-promise-native');
-const createError = require('http-errors');
-// const setupHTTP = require('./middleware/global-handlers');
-// const zlib = require('zlib');
-// const gzip = zlib.createGzip();
+const request = require('request-promise-native')
 
 // Load Modules for Working with Files and Events
 const fs = require('fs');
-const path = require('path');
 let Emitter = require('events');
 
 // Load Custom Modules for Configuring the Application
-const config = require('./config');
-const eventsConfig = require('./events/config');
+const config = require('./events/config');
 const apiUtil = require('./lib/api-util');
 
-// Express Framework side of the app
 const express = require('express');
 const app = express();
 const portNumber = process.env.PORT || 3000;
 
-//  -- View engine setup
-app.set('views', path.join(__dirname, 'views'));
-app.set('view engine', 'jade');
-// -- View Static Resources
-app.use(express.static(path.join(__dirname, 'public')));
-// setupHTTP(app);
-
-// Load Extrax modules for playing with complex json objects
-const jp = require('jsonpath');
-
-// Load embedded modules for working with external Weather APIs
 const currentsOnDemand = require('./lib/currents-on-demand');
+const jp = require('jsonpath');
 const weatherAlertHeadlines = require('./lib/weather-alert-headlines')
 const weatherAlertDetails = require('./lib/weather-alert-details')
+const tropicalForecastProjectedPath = require('./lib/tropical-forecast-projected-path')
+const dailyForecast = require('./lib/daily-forecast')
+const severeWeatherPower = require('./lib/severe-weather-power-disruption-index')
 
-// Initiate global variables 
 let alertCounter = 0;
 let alertsFonud = [];
 let alertEventEmitter = new Emitter();
-/**
- * Setting up a job to look for weather alert headlines every 10 minutes
- */
-let interval = 1000 * 60 * 60 // 60 minutes as default value
-
-
-const writable = fs.createWriteStream(path.join(__dirname,eventsConfig.alerts.fileLocation), 'utf8');
-
+const writable = fs.createWriteStream(__dirname + config.alerts.fileLocation, 'utf8');
 
 const handleAlertEmitter = function(msg){
-  console.log("Auto generated message from ON DEMAND service layer" + msg);
-  console.log("============= Weather alerts are aggregated in the file");
+  console.log("&&&&&&&&&&&&&&  " + msg);
+  console.log("Weather alerts are aggregated in the file");
   try{
     writable.write(JSON.stringify(alertsFonud));
   }catch(e){
@@ -58,15 +36,14 @@ const handleAlertEmitter = function(msg){
   }
 };
 
-
 const handleFail = function (err) {
   // API call failed...
-  console.error(err.hasOwnProperty('message') ? err.message : err);
-
+  console.error(err.hasOwnProperty('message') ? err.message : err)
 };
 
+
 // Main Event Emitters Listener
-alertEventEmitter.on(eventsConfig.events.alertCODDone, (msg)=>handleAlertEmitter(msg));
+alertEventEmitter.on(config.events.alertCODDone, (msg)=>handleAlertEmitter(msg));
 writable.on('error', function(e) {handleFail(e)});
 
 const callWeatherAlertHeadlines = function (lat, lon) {
@@ -85,20 +62,22 @@ const callWeatherAlertHeadlines = function (lat, lon) {
     .catch(handleFail)
 }
 
-const callCurrentsOnDemand = function(alertEvent){
+const callCurrentsOnDemand = async function(alertEvent){
   let options = currentsOnDemand.requestOptions(alertEvent.latitude, alertEvent.longitude);
-  request(options)
+  await request(options)
     .then(parsedBody => {
       let weatherTempData = currentsOnDemand.handleResponse(parsedBody);
       let tempNode = jp.nodes(alertsFonud, `$[?(@.detailKey=="${alertEvent.detailKey}")]`);
       tempNode[0].value.cod=weatherTempData;
       ++alertCounter;
       if(alertsFonud.length == alertCounter){
-        alertEventEmitter.emit(eventsConfig.events.alertCODDone, 'Done');
+        alertEventEmitter.emit(config.events.alertCODDone, 'Done');
         alertCounter=0;
       }
+      return alertsFonud;
     })
     .catch(handleFail)
+  return alertsFonud;
 };
 
 const callWeatherAlertHeadlinesByState =  async function (state, country, next) {
@@ -136,6 +115,29 @@ const callWeatherAlertDetails = function (detailKey) {
     .catch(handleFail)
 }
 
+const callTropicalForecastProjectedPath = function () {
+  let options = tropicalForecastProjectedPath.requestOptions()
+
+  request(options)
+    .then(tropicalForecastProjectedPath.handleResponse)
+    .catch(handleFail)
+}
+
+const callDailyForecast = function (lat, lon) {
+  let options = dailyForecast.requestOptions(lat, lon)
+
+  request(options)
+    .then(dailyForecast.handleResponse)
+    .catch(handleFail)
+}
+
+const callSevereWeatherPowerDisruption = function (lat, lon) {
+  let options = severeWeatherPower.requestOptions(lat, lon)
+
+  request(options)
+    .then(severeWeatherPower.handleResponse)
+    .catch(handleFail)
+};
 
 // Configure the locations (lat/lon) you want to use
 const loc = {
@@ -153,69 +155,38 @@ const states = {
   california : {stateCode: 'CA', countryCode: 'US'}
 };
 
-console.log(config.getAlertsDetailsENDPOINT());
-// Next API Event Emitters Listener
-apiUtil.nextAPICallEmitter.on(eventsConfig.events.nextAPICall, (next)=>callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode, next));
-
-app.get(config.getAlertsSummaryENDPOINT(), async (request, response) => {
+app.get("/loadAggregatedWeatherAlerts", async (request, response, next) => {
   let alerts = await callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode, null);
-  response.send(alerts);
+  console.log("Aler`ts "+ alerts);
+  response.json(alerts);
 });
 
-app.get(config.getAlertsDetailsENDPOINT(), (request, response) => {
-  // const readable = fs.createReadStream(path.join(__dirname, eventsConfig.alerts.fileLocation), { encoding: 'utf8', highWaterMark: 16 * 1024 });
-  response.setHeader('Content-Type', 'application/json')
-  const readable = fs.readFileSync(path.join(__dirname, eventsConfig.alerts.fileLocation), 'utf8');
-  // let alertsData = [];
-  // readable.on('data', function(chunk) {
-    
-  // });
-  // readable.on('open', function () {
-  //   readable.pipe(response);
-  // });
-  // readable.pipe(response);
-  response.json(JSON.parse(readable));
+t("/loadAggregatedWeatherAlerts", async (request, response, next) => {
+  let alerts = await callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode, null);
+  console.log("Aler`ts "+ alerts);
+  response.json(alerts);
 });
+/**
+ * Make a single API call
+ */
+// callDailyForecast(loc.raleigh.lat, loc.raleigh.lon)
+// callWeatherAlertHeadlines(loc.lakecity.lat, loc.lakecity.lon)
+// callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode, null);
+// callSevereWeatherPowerDisruption(loc.jakarta.lat, loc.jakarta.lon)
+// callTropicalForecastProjectedPath()
+// callWeatherAlertDetails('06439e88-320a-3722-ae90-097484ff2277')
 
-app.post(config.getConfigureAlertsENDPOINT, (request, response, next) => {
-  const postOutput = {'status': 'success'};
-  try{
-    let intervalInput = request.body.interval;
-    if(intervalInput != undefined && intervalInput != 0){
-      interval = 1000 * 60 * intervalInput;
-      setInterval(() => {
-        callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode, null);
-      }, interval)
-    }
-  }catch(e){
-    next(createError(500));
-  }
-  response.json(postOutput);
-});
+// Next API Event Emitters Listener
+apiUtil.nextAPICallEmitter.on(config.events.nextAPICall, (next)=>callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode, next));
 
-
-
-
-
-// Initiate the file with list of alerts
-callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode, null);
-
-// Catch 404 and forward to error handler
-app.use(function(req, res, next) {
-  next(createError(404));
-});
-
-// Generic Error Handler
-app.use(function(err, req, res, next) {
-  // set locals, only providing error in development
-  res.locals.message = err.message;
-  res.locals.error = req.app.get('env') === 'development' ? err : {};
-  
-  // Render the error page
-  res.status(err.status || 500);
-  res.render('error');
-});
-
-
-// Initiate Middleware API Server
 app.listen(portNumber);
+
+/**
+ * Setting up a job to look for weather alert headlines every 10 minutes
+ */
+// const interval = 1000 * 60 * 10 // 10 minutes
+
+// setInterval(() => {
+//   // callWeatherAlertHeadlines(loc.lakecity.lat, loc.lakecity.lon)
+//   callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode, null);
+// }, interval)
