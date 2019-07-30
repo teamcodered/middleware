@@ -52,7 +52,7 @@ const handleFail = function (err) {
 
 };
 
-
+// Add Alerts Build Completion Event
 const handleAlertEmitter = function(msg){
   fs.unlinkSync(path.join(__dirname,eventsConfig.alerts.fileLocation));
   console.log("===== File is cleared =====");
@@ -70,23 +70,7 @@ const handleAlertEmitter = function(msg){
 // Main Event Emitters Listener
 alertEventEmitter.on(eventsConfig.events.alertCODDone, (msg)=>handleAlertEmitter(msg));
 
-
-const callWeatherAlertHeadlines = function (lat, lon) {
-  let options = weatherAlertHeadlines.requestOptions(lat, lon)
-
-  request(options)
-    .then(parsedBody => {
-      console.log(parsedBody);
-      let detailKeys = weatherAlertHeadlines.handleResponse(parsedBody)
-      if (detailKeys && detailKeys.length > 0) {
-        detailKeys.forEach(detailKey => {
-          callWeatherAlertDetails(detailKey)
-        })
-      }
-    })
-    .catch(handleFail)
-}
-
+// Alerts Services Calls & Setup
 const callCurrentsOnDemand = function(alertEvent){
   let options = currentsOnDemand.requestOptions(alertEvent.latitude, alertEvent.longitude);
   request(options)
@@ -157,6 +141,8 @@ const states = {
 // Next API Event Emitters Listener
 apiUtil.nextAPICallEmitter.on(eventsConfig.events.nextAPICall, (next)=>callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode, next));
 
+
+// API ENDPOINTS SETUP
 app.get(config.getAlertsSummaryENDPOINT(), async (request, response) => {
   let alerts = await callWeatherAlertHeadlinesByState(states.california.stateCode,states.california.countryCode, null);
   response.send(alerts);
@@ -166,14 +152,6 @@ app.get(config.getAlertsDetailsENDPOINT(), (request, response) => {
   // const readable = fs.createReadStream(path.join(__dirname, eventsConfig.alerts.fileLocation), { encoding: 'utf8', highWaterMark: 16 * 1024 });
   response.setHeader('Content-Type', 'application/json')
   const readable = fs.readFileSync(path.join(__dirname, eventsConfig.alerts.fileLocation), 'utf8');
-  // let alertsData = [];
-  // readable.on('data', function(chunk) {
-    
-  // });
-  // readable.on('open', function () {
-  //   readable.pipe(response);
-  // });
-  // readable.pipe(response);
   response.json(JSON.parse(readable));
 });
 
